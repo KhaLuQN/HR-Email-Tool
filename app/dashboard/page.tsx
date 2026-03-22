@@ -4,8 +4,17 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import type { GmailLabel, Template, Candidate, SendLogEntry, SendResult } from '@/types'
 import { applyTemplate } from '@/lib/template'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Image from '@tiptap/extension-image'
+import Link from '@tiptap/extension-link'
+import Underline from '@tiptap/extension-underline'
+import { TextStyle } from '@tiptap/extension-text-style'
+import Color from '@tiptap/extension-color'
+import TextAlign from '@tiptap/extension-text-align'
+import Placeholder from '@tiptap/extension-placeholder'
 
-// ─── TipTap Editor Component (CDN-based) ──────────────────────────────────────
+// ─── TipTap Editor Component ──────────────────────────────────────────────────
 function TipTapEditor({
   value,
   onChange,
@@ -17,124 +26,46 @@ function TipTapEditor({
   placeholder?: string
   minHeight?: number
 }) {
-  const editorRef = useRef<HTMLDivElement>(null)
-  const [isReady, setIsReady] = useState(false)
-  const editorInstance = useRef<any>(null)
   const isUpdatingRef = useRef(false)
 
-  // Load TipTap scripts
-  useEffect(() => {
-    const loadScript = (src: string): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) {
-          resolve()
-          return
-        }
-        const script = document.createElement('script')
-        script.src = src
-        script.onload = () => resolve()
-        script.onerror = reject
-        document.head.appendChild(script)
-      })
-    }
-
-    const loadCSS = (href: string) => {
-      if (document.querySelector(`link[href="${href}"]`)) return
-      const link = document.createElement('link')
-      link.rel = 'stylesheet'
-      link.href = href
-      document.head.appendChild(link)
-    }
-
-    const init = async () => {
-      try {
-        // Load TipTap UMD bundles
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/core@2.11.5/dist/index.umd.min.js')
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/pm@2.11.5/dist/index.umd.min.js')
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@2.11.5/dist/index.umd.min.js')
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/extension-image@2.11.5/dist/index.umd.min.js')
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/extension-link@2.11.5/dist/index.umd.min.js')
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/extension-underline@2.11.5/dist/index.umd.min.js')
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/extension-text-style@2.11.5/dist/index.umd.min.js')
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/extension-color@2.11.5/dist/index.umd.min.js')
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/extension-text-align@2.11.5/dist/index.umd.min.js')
-        await loadScript('https://cdn.jsdelivr.net/npm/@tiptap/extension-placeholder@2.11.5/dist/index.umd.min.js')
-        setIsReady(true)
-      } catch (err) {
-        console.error('Failed to load TipTap scripts', err)
-      }
-    }
-    init()
-  }, [])
-
-  // Initialize editor when ready
-  useEffect(() => {
-    if (!isReady || !editorRef.current || editorInstance.current) return
-
-    const w = window as any
-    const { Editor } = w['@tiptap/core'] || {}
-    const { StarterKit } = w['@tiptap/starter-kit'] || {}
-    const { Image: TiptapImage } = w['@tiptap/extension-image'] || {}
-    const { Link } = w['@tiptap/extension-link'] || {}
-    const { Underline } = w['@tiptap/extension-underline'] || {}
-    const { TextStyle } = w['@tiptap/extension-text-style'] || {}
-    const { Color } = w['@tiptap/extension-color'] || {}
-    const { TextAlign } = w['@tiptap/extension-text-align'] || {}
-    const { Placeholder } = w['@tiptap/extension-placeholder'] || {}
-
-    if (!Editor || !StarterKit) {
-      console.error('TipTap not loaded properly')
-      return
-    }
-
-    const extensions: any[] = [
+  const editor = useEditor({
+    extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-    ]
-
-    if (TiptapImage) extensions.push(TiptapImage.configure({ inline: true, allowBase64: true }))
-    if (Link) extensions.push(Link.configure({ openOnClick: false }))
-    if (Underline) extensions.push(Underline)
-    if (TextStyle) extensions.push(TextStyle)
-    if (Color) extensions.push(Color)
-    if (TextAlign) extensions.push(TextAlign.configure({ types: ['heading', 'paragraph'] }))
-    if (Placeholder) extensions.push(Placeholder.configure({ placeholder: placeholder || 'Nhập nội dung email...' }))
-
-    const editor = new Editor({
-      element: editorRef.current,
-      extensions,
-      content: value || '',
-      onUpdate: ({ editor: ed }: any) => {
-        if (!isUpdatingRef.current) {
-          onChange(ed.getHTML())
-        }
-      },
-    })
-
-    editorInstance.current = editor
-    return () => { editor.destroy(); editorInstance.current = null }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady])
+      Image.configure({ inline: true, allowBase64: true }),
+      Link.configure({ openOnClick: false }),
+      Underline,
+      TextStyle,
+      Color,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      Placeholder.configure({ placeholder: placeholder || 'Nhập nội dung email...' }),
+    ],
+    content: value || '',
+    onUpdate: ({ editor: ed }) => {
+      if (!isUpdatingRef.current) {
+        onChange(ed.getHTML())
+      }
+    },
+  })
 
   // Sync external value changes
   useEffect(() => {
-    if (editorInstance.current && value !== editorInstance.current.getHTML()) {
+    if (editor && value !== editor.getHTML()) {
       isUpdatingRef.current = true
-      editorInstance.current.commands.setContent(value || '', false)
+      editor.commands.setContent(value || '', { emitUpdate: false })
       isUpdatingRef.current = false
     }
-  }, [value])
+  }, [value, editor])
 
   const exec = (command: string, ...args: any[]) => {
-    const ed = editorInstance.current
-    if (!ed) return
-    const chain = ed.chain().focus()
-    if (typeof chain[command] === 'function') {
-      chain[command](...args).run()
+    if (!editor) return
+    const chain = editor.chain().focus()
+    if (typeof (chain as any)[command] === 'function') {
+      (chain as any)[command](...args).run()
     }
   }
 
   const isActive = (name: string, attrs?: any) => {
-    return editorInstance.current?.isActive(name, attrs) ?? false
+    return editor?.isActive(name, attrs) ?? false
   }
 
   const insertImage = () => {
@@ -147,7 +78,7 @@ function TipTapEditor({
     if (url) exec('setLink', { href: url })
   }
 
-  if (!isReady) {
+  if (!editor) {
     return (
       <div
         style={{
@@ -289,11 +220,7 @@ function TipTapEditor({
       </div>
 
       {/* Editor content */}
-      <div
-        ref={editorRef}
-        className="tiptap-content"
-        style={{ minHeight }}
-      />
+      <EditorContent editor={editor} className="tiptap-content" style={{ minHeight }} />
     </div>
   )
 }
