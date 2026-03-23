@@ -412,7 +412,9 @@ export default function EmailComposer({
     useEffect(() => { setSubject(initialSubject); }, [initialSubject]);
     useEffect(() => {
         setBodyHtml(initialBody);
-        if (editorRef.current) {
+        // Only update DOM if editor is NOT focused — avoids resetting cursor mid-keystroke
+        // (which causes text reversal with Vietnamese IME / Unikey Telex)
+        if (editorRef.current && document.activeElement !== editorRef.current) {
             editorRef.current.innerHTML = initialBody;
         }
     }, [initialBody]);
